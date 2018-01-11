@@ -1,4 +1,4 @@
-
+用例及目标结果
 //normal   	一次
 var a = 4; var b = a ; print(a);
 
@@ -33,16 +33,9 @@ function internal_check_time(){
 }
 pirntfaaaa();
 
-编译：
-http://www.cnblogs.com/lzpong/p/5888289.html
-http://www.cnblogs.com/wjx0912/p/6610791.html
-set DEPOT_TOOLS_WIN_TOOLCHAIN=0
-set GYP_MSVS_VERSION=2015
-python gypfiles\gyp_v8.py -Dtarget_arch=ia32 -Dcomponent=shared_library -f msvs
 
 
-
-
+学习：
 1、platform 提供了线程池
 2、Isolate 提供了孤立的环境
 3、Context 提供了上下文的SHELL环境
@@ -104,8 +97,8 @@ enum ScopeType : uint8_t {
 
 
 
-1、用哪个v8版本测试？  PC 上使用5.6，LINUX 使用5.8
-2、接口怎么封装		   internal_check_time 无参数 
+1、用哪个v8版本测试？  PC,LINUX 都使用5.6.331
+2、接口怎么封装		   加参数 __enable_check_time__  
 3、单元测试在哪做？    v8库的demo里
 
 4、网页说的运行时脚本执行。
@@ -117,9 +110,6 @@ enum ScopeType : uint8_t {
 7、检查代码是否存在内存泄漏   13~17兆
 8、复杂和丰富的脚本检测是否存在崩溃的风险
 
-
-1、没有函数添加   
-
 内存泄漏疑问：
 1、NewStringFromAscii
 2、new(zone()) ZoneList<Statement*>(16, zone());
@@ -127,25 +117,13 @@ enum ScopeType : uint8_t {
 4、new (zone()) ZoneList<Expression*>(1, zone());
 5、NewCall
 
-//1-lib库编译最小化 40兆，但是运行出错
-1.C/C++ —> General —> None
-2.C/C++ —> Optimization —> Optimization: Disabled(/Od)
 
-
-//2-lib库编译最小化 70兆
-1.C/C++ —> General —> Program Database for Edit And Continue (/ZI)
-2.C/C++ —> Optimization —> Maximize Speed (/O2)
-
-//2-lib库编译最小化 70兆
-1.C/C++ —> General —> None
-
-
-
-
-
-__enable_check_time__
-
-
+WIN编译：
+http://www.cnblogs.com/lzpong/p/5888289.html
+http://www.cnblogs.com/wjx0912/p/6610791.html
+set DEPOT_TOOLS_WIN_TOOLCHAIN=0
+set GYP_MSVS_VERSION=2015
+python gypfiles\gyp_v8.py -Dtarget_arch=ia32 -Dcomponent=shared_library -f msvs
 
 ubuntu 编译v8
 5.6.331
