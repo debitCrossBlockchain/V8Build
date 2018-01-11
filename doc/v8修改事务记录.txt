@@ -1,0 +1,215 @@
+
+//normal   	一次
+var a = 4; var b = a ; print(a);
+
+//for    	两次
+for(var i = 1; i <= 1; i++) {print("a"); print("b") ; print("c")} print("aaa"); print("bbb")
+
+//if    	两次
+if(0){ print("a"); print("b") ; print("c"); } else {	print("c"); print("b") ; print("a"); }
+
+//while		六次
+var i = 1; while(i <= 5) { print("a"); print("b"); i++; }
+
+//do while	六次
+var i = 1; do { print("a"); print("b"); i++; }while(i <= 5)
+
+//switch	两次
+var i = 2; switch(i) { case 0: {		print("0"); print("0"); print("0"); 		break;	}case 1:{	print("1"); print("1"); print("1");  break; } default:{	print("d"); print("d"); print("d"); 		break;}}
+
+//continue	七次
+var i = 1; while(i <= 5) { if( i == 3) { i++; continue;}; print("a"); i++; }
+
+//break		四次
+var i = 1; while(i <= 5) { if( i == 3) break; i++; }
+
+
+var internal_check_time = 1; print(internal_check_time);
+
+function internal_check_time(){
+    var a = 10;
+	print(a);
+    return a;
+}
+pirntfaaaa();
+
+编译：
+http://www.cnblogs.com/lzpong/p/5888289.html
+http://www.cnblogs.com/wjx0912/p/6610791.html
+set DEPOT_TOOLS_WIN_TOOLCHAIN=0
+set GYP_MSVS_VERSION=2015
+python gypfiles\gyp_v8.py -Dtarget_arch=ia32 -Dcomponent=shared_library -f msvs
+
+
+
+
+1、platform 提供了线程池
+2、Isolate 提供了孤立的环境
+3、Context 提供了上下文的SHELL环境
+4、v8::Local 垃圾回收器
+5、MaybeLocalt 提供了非空的垃圾回收器
+6、ParseInfo 编译器编译配置，输入，输出的工具
+7、Zone 小的内存区块
+8、FunctionLiteral 函数名字（同时是一个ast节点）
+9、Scanner js扫描器
+10、ZoneList<Statement*>* body = new(zone()) ZoneList<Statement*>(16, zone());
+
+ParseVariableStatement
+
+
+factory()->NewExpressionStatement(expr, pos);
+
+factory()->NewConditional(expression, left, right, pos);
+
+AsmType* AsmTyper::ValidateStatement(Statement* statement) {
+  switch (statement->node_type()) {
+    default:
+      FAIL(statement, "Statement type invalid for asm.js.");
+    case AstNode::kBlock:
+      return ValidateBlockStatement(statement->AsBlock());
+    case AstNode::kExpressionStatement:
+      return ValidateExpressionStatement(statement->AsExpressionStatement());
+    case AstNode::kEmptyStatement:
+      return ValidateEmptyStatement(statement->AsEmptyStatement());
+    case AstNode::kIfStatement:
+      return ValidateIfStatement(statement->AsIfStatement());
+    case AstNode::kReturnStatement:
+      return ValidateReturnStatement(statement->AsReturnStatement());
+    case AstNode::kWhileStatement:
+      return ValidateWhileStatement(statement->AsWhileStatement());
+    case AstNode::kDoWhileStatement:
+      return ValidateDoWhileStatement(statement->AsDoWhileStatement());
+    case AstNode::kForStatement:
+      return ValidateForStatement(statement->AsForStatement());
+    case AstNode::kBreakStatement:
+      return ValidateBreakStatement(statement->AsBreakStatement());
+    case AstNode::kContinueStatement:
+      return ValidateContinueStatement(statement->AsContinueStatement());
+    case AstNode::kSwitchStatement:
+      return ValidateSwitchStatement(statement->AsSwitchStatement());
+  }
+
+  return AsmType::Void();
+}
+
+enum ScopeType : uint8_t {
+  EVAL_SCOPE,      // 0 The top-level scope for an eval source.
+  FUNCTION_SCOPE,  // 1 The top-level scope for a function.
+  MODULE_SCOPE,    // 2 The scope introduced by a module literal
+  SCRIPT_SCOPE,    // 3 The top-level scope for a script or a top-level eval.
+  CATCH_SCOPE,     // 4 The scope introduced by catch.
+  BLOCK_SCOPE,     // 5 The scope introduced by a new block.
+  WITH_SCOPE       // 6 The scope introduced by with.
+};
+
+
+
+1、用哪个v8版本测试？  PC 上使用5.6，LINUX 使用5.8
+2、接口怎么封装		   internal_check_time 无参数 
+3、单元测试在哪做？    v8库的demo里
+
+4、网页说的运行时脚本执行。
+	目前是在JS解析里做的，跟何时解析脚本和运行无关。
+	解析JS有两个接口：ParseOnBackground和Parse，
+	现在是在Parse里做的，ParseOnBackground外部调用 StartStreamingScript接口才会走这个流程，暂时没有修改。
+5、internal_check_time 已修改，需要在外部判断
+6、完善的单元测试用例  OK
+7、检查代码是否存在内存泄漏   13~17兆
+8、复杂和丰富的脚本检测是否存在崩溃的风险
+
+
+1、没有函数添加   
+
+内存泄漏疑问：
+1、NewStringFromAscii
+2、new(zone()) ZoneList<Statement*>(16, zone());
+3、NewUnresolved
+4、new (zone()) ZoneList<Expression*>(1, zone());
+5、NewCall
+
+//1-lib库编译最小化 40兆，但是运行出错
+1.C/C++ —> General —> None
+2.C/C++ —> Optimization —> Optimization: Disabled(/Od)
+
+
+//2-lib库编译最小化 70兆
+1.C/C++ —> General —> Program Database for Edit And Continue (/ZI)
+2.C/C++ —> Optimization —> Maximize Speed (/O2)
+
+//2-lib库编译最小化 70兆
+1.C/C++ —> General —> None
+
+
+
+
+
+__enable_check_time__
+
+
+
+ubuntu 编译v8
+5.6.331
+配置 depot_tools.zip 环境变量
+
+git config --global http.proxy 'socks5://192.168.50.71:1080'
+git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+export PATH=/home/bubi/tools/depot_tools:$PATH
+
+
+sudo apt install privoxy
+sudo service privoxy restart
+sudo vim /etc/privoxy/config
+forward-socks5 / 192.168.50.71:1080 .
+
+export http_proxy=127.0.0.1:8118  
+export https_proxy=127.0.0.1:8118
+
+gclient
+
+fetch v8
+cd v8
+
+git checkout origin/5.6.331
+gclient sync
+tools/dev/v8gen.py x64.release
+gn args out.gn/x64.release
+	is_component_build = false
+	v8_static_library = true
+
+ninja -C out.gn/x64.release
+ar cr out.gn/x64.release/obj/libv8_base.a  out.gn/x64.release/obj/v8_base/*.o
+ar cr out.gn/x64.release/obj/libv8_external_snapshot.a out.gn/x64.release/obj/v8_external_snapshot/*.o
+ar cr out.gn/x64.release/obj/libv8_libsampler.a out.gn/x64.release/obj/v8_libsampler/*.o
+ar cr out.gn/x64.release/obj/src/inspector/libinspector.a  out.gn/x64.release/obj/src/inspector/inspector/*.o
+g++ -I. -Iinclude samples/shell.cc -o shell -Wl,--start-group \
+out.gn/x64.release/obj/{libv8_{base,libbase,external_snapshot,libplatform,libsampler},\
+third_party/icu/libicu{uc,i18n},src/inspector/libinspector}.a \
+-Wl,--end-group -lrt -ldl -pthread -std=c++0x
+
+
+g++ -I. -Iinclude samples/hello-world.cc -o hello-world -Wl,--start-group \
+out.gn/x64.release/obj/{libv8_{base,libbase,external_snapshot,libplatform,libsampler},\
+third_party/icu/libicu{uc,i18n},src/inspector/libinspector}.a \
+-Wl,--end-group -lrt -ldl -pthread -std=c++0x
+
+
+
+cp out.gn/x64.release/*.bin .
+cp out.gn/x64.release/icudtl.dat .
+
+
+
+参考文档：
+http://blog.csdn.net/liaomin6t/article/details/60882598
+https://developers.google.com/v8/build
+https://github.com/v8/v8/wiki/Getting-Started-with-Embedding
+http://blog.csdn.net/tanningzhong/article/details/52817399
+https://www.bbsmax.com/A/kvJ3XBO5gM/
+https://www.jianshu.com/p/89d26429c91f
+https://github.com/v8/v8/wiki
+http://www.cnblogs.com/wjx0912/p/6610791.html
+https://stackoverflow.com/questions/15785548/manipulating-the-v8-ast
+
+
+
+
