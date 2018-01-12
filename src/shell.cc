@@ -79,6 +79,7 @@ bool ExecuteString(v8::Isolate* isolate, v8::Local<v8::String> source,
                    bool report_exceptions);
 void Print(const v8::FunctionCallbackInfo<v8::Value>& args);
 void CheckTime(const v8::FunctionCallbackInfo<v8::Value>& args);
+void Include(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Read(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Load(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Quit(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -171,6 +172,11 @@ v8::Local<v8::Context> CreateShellContext(v8::Isolate* isolate) {
 	  .ToLocalChecked(),
 	  v8::FunctionTemplate::New(isolate, CheckTime));
 
+  global->Set(
+	  v8::String::NewFromUtf8(isolate, "include", v8::NewStringType::kNormal)
+	  .ToLocalChecked(),
+	  v8::FunctionTemplate::New(isolate, Include));
+
   // Bind the global 'read' function to the C++ Read callback.
   global->Set(v8::String::NewFromUtf8(
                   isolate, "read", v8::NewStringType::kNormal).ToLocalChecked(),
@@ -226,6 +232,56 @@ void CheckTime(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	g_check_time_count++;
 
 	return;
+}
+
+void Include(const v8::FunctionCallbackInfo<v8::Value>& args) 
+{	
+	v8::Local<v8::Context> context = args.GetIsolate()->GetCurrentContext();
+	// Enter the execution environment before evaluating any code.
+	v8::Context::Scope context_scope(context);
+
+	std::string file_name = "D:\\Workspace\\v8\\v8-2018-01-04\\v8\\samples\\big.js";
+	static FILE * stream = fopen(file_name.data(), "rb");
+	if (stream == nullptr)
+	{
+		printf("cannot find %s\n", file_name.c_str());
+		return;
+	}
+	fseek(stream, 0, SEEK_END);
+	size_t len = ftell(stream);
+	char *buffer = new char[len + 1];
+	memset(buffer, 0, len + 1);
+	fseek(stream, 0, SEEK_SET);
+	fread(buffer, len, 1, stream);
+	//__enable_check_time__
+	v8::Local<v8::String> name(v8::String::NewFromUtf8(context->GetIsolate(), "__enable_check_time__", v8::NewStringType::kNormal).ToLocalChecked());
+	std::string str(buffer, len);
+	ExecuteString(context->GetIsolate(), v8::String::NewFromUtf8(context->GetIsolate(), str.data(), v8::NewStringType::kNormal).ToLocalChecked(), name, true, true);
+	
+	//do {
+
+	//	v8::TryCatch try_catch(args.GetIsolate());
+	//	std::string js_file = "";
+
+	//	v8::Local<v8::String> source = v8::String::NewFromUtf8(args.GetIsolate(), js_file.c_str());
+	//	v8::Local<v8::Script> script;
+
+	//	v8::Local<v8::String> check_time_name(
+	//		v8::String::NewFromUtf8(args.GetIsolate()->GetCurrentContext()->GetIsolate(), "__enable_check_time__",
+	//		v8::NewStringType::kNormal).ToLocalChecked());
+	//	v8::ScriptOrigin origin_check_time_name(check_time_name);
+
+	//	if (!v8::Script::Compile(args.GetIsolate()->GetCurrentContext(), source, &origin_check_time_name).ToLocal(&script)) {
+	//		ReportException(args.GetIsolate(), &try_catch);
+	//		break;
+	//	}
+
+	//	v8::Local<v8::Value> result;
+	//	if (!script->Run(args.GetIsolate()->GetCurrentContext()).ToLocal(&result)) {
+	//		ReportException(args.GetIsolate(), &try_catch);
+	//	}
+	//} while (false);
+	//return v8::Undefined(args.GetIsolate());
 }
 
 
@@ -383,7 +439,7 @@ int RunMain(v8::Isolate* isolate, v8::Platform* platform, int argc,
 // The read-eval-execute loop of the shell.
 void RunShell(v8::Local<v8::Context> context, v8::Platform* platform) {
   fprintf(stderr, "V8 version %s [sample shell]\n", v8::V8::GetVersion());
-  static const int kBufferSize = 256;
+  static const int kBufferSize = 100 * 1000;
   // Enter the execution environment before evaluating any code.
   v8::Context::Scope context_scope(context);
   v8::Local<v8::String> name(
@@ -417,8 +473,8 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 	
 	if (split_cases.empty())
 	{
-		std::string file_name = "v8-utest.txt";
-		//std::string file_name = "D:\\Workspace\\v8\\v8-2018-01-04\\v8\\build\\Debug\\v8-utest.txt";
+		//std::string file_name = "v8-utest.txt";
+		std::string file_name = "D:\\Workspace\\v8\\v8-2018-01-04\\v8\\build\\Debug\\v8-utest.txt";
 		static FILE * stream = fopen(file_name.data(), "r");
 		
 		if (stream == nullptr)

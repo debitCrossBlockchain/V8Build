@@ -212,6 +212,7 @@ class V8_EXPORT_PRIVATE Parser : public NON_EXPORTED_BASE(ParserBase<Parser>) {
   void UpdateCallList(ParseInfo* info);
   void IterateReplace(ZoneList<Statement*>* statement_list, Factory* isolate_factory, AstValueFactory* ast_value_factory, Scope* scope, Zone* info_zone);
   void GenerateNewStatement(ZoneList<Statement*>* new_body, Factory* isolate_factory, AstValueFactory* ast_value_factory, Scope* scope, Zone* info_zone);
+  bool IsValidBlock(BlockT block);
 
   void ParseOnBackground(ParseInfo* info);
 

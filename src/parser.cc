@@ -30,7 +30,6 @@
 void no_printf(const char* format, ...) {}
 #define LOG_INFO no_printf
 #endif
-#define MAX_INVALID_VALUE 100
 
 namespace v8 {
 namespace internal {
@@ -3870,12 +3869,7 @@ void Parser::IterateReplace(ZoneList<Statement*>* statement_list, Factory* isola
 {
 	LOG_INFO("IterateReplace In, list len:%d, capacity:%d\n", statement_list->length(), statement_list->capacity());
 	
-	if (statement_list == nullptr || statement_list->capacity() <= 0)
-	{
-		return;
-	}
-
-	if (statement_list->length() <= 0 && statement_list->capacity() > MAX_INVALID_VALUE)
+	if (statement_list == nullptr || statement_list->capacity() <= 0 || statement_list->length() < 0)
 	{
 		return;
 	}
@@ -3884,6 +3878,10 @@ void Parser::IterateReplace(ZoneList<Statement*>* statement_list, Factory* isola
 	for (int i = 0; i < statement_list->length(); i++)
 	{
 		Statement* stmt = statement_list->at(i);
+		if (!IsValidBlock((BlockT)stmt))
+		{
+			continue;
+		}
 		AstNode::NodeType note_type = stmt->node_type();
 		LOG_INFO("IterateReplace In for, note_type:%d\n", (int)note_type);
 		switch (note_type) 
@@ -3892,6 +3890,12 @@ void Parser::IterateReplace(ZoneList<Statement*>* statement_list, Factory* isola
 			{
 				LOG_INFO("bubi kBlock\n");
 				Block* block = stmt->AsBlock();
+				if (!IsValidBlock(block))
+				{
+					LOG_INFO("bubi invalid kBlock\n");
+					break;
+				}
+
 				ZoneList<Statement*>* stat_list = block->statements();
 				if (stat_list->length() > 1)
 				{
@@ -3915,16 +3919,17 @@ void Parser::IterateReplace(ZoneList<Statement*>* statement_list, Factory* isola
 				IfStatement *if_stmt = (IfStatement*)stmt;
 				//then body
 				BlockT then_body = (BlockT)if_stmt->then_statement();
-				if (!then_body->IsEmpty())
+				if (IsValidBlock(then_body))
 				{
+					bool isempty_statement = then_body->IsEmptyStatement();
 					ZoneList<Statement*>* then_stat_list = then_body->statements();
-					LOG_INFO("kIfStatement len:%d\n", then_stat_list->length());
+					LOG_INFO("kIfStatement len:%d,isempty_statement:%d\n", then_stat_list->length(), isempty_statement);
 					IterateReplace(then_stat_list, isolate_factory, ast_value_factory, scope, info_zone);
 				}
 					
 				//else body
 				BlockT else_body = (BlockT)if_stmt->else_statement();
-				if (!else_body->IsEmpty())
+				if (IsValidBlock(else_body))
 				{
 					ZoneList<Statement*>* else_stat_list = else_body->statements();
 					LOG_INFO("else_stat_list len:%d\n", else_stat_list->length());
@@ -3941,6 +3946,10 @@ void Parser::IterateReplace(ZoneList<Statement*>* statement_list, Factory* isola
 			{
 				WhileStatement *while_stmt = (WhileStatement*)stmt;
 				BlockT body = (BlockT)while_stmt->body();
+				if (!IsValidBlock(body))
+				{ 
+					break;
+				}
 				ZoneList<Statement*>* stat_list = body->statements();
 				LOG_INFO("kWhileStatement len:%d\n", stat_list->length());
 				IterateReplace(stat_list, isolate_factory, ast_value_factory, scope, info_zone);
@@ -3950,6 +3959,11 @@ void Parser::IterateReplace(ZoneList<Statement*>* statement_list, Factory* isola
 			{
 				DoWhileStatement *dowhile_stmt = (DoWhileStatement*)stmt;
 				BlockT body = (BlockT)dowhile_stmt->body();
+				if (!IsValidBlock(body))
+				{
+					break;
+				}
+
 				ZoneList<Statement*>* stat_list = body->statements();
 				LOG_INFO("kDoWhileStatement len:%d\n", stat_list->length());
 				IterateReplace(stat_list, isolate_factory, ast_value_factory, scope, info_zone);
@@ -3959,8 +3973,13 @@ void Parser::IterateReplace(ZoneList<Statement*>* statement_list, Factory* isola
 			{
 				ForStatement *for_stmt = (ForStatement*)stmt;
 				BlockT body = (BlockT)for_stmt->body();
+				if (!IsValidBlock(body))
+				{
+					break;
+				}
+				
 				ZoneList<Statement*>* stat_list = body->statements();
-				LOG_INFO("kForStatement len:%d\n", stat_list->length());
+				LOG_INFO("kForStatement len:%d, body node:%d\n", stat_list->length(), body->node_type());
 				IterateReplace(stat_list, isolate_factory, ast_value_factory, scope, info_zone);
 				break;
 			}
@@ -3981,8 +4000,12 @@ void Parser::IterateReplace(ZoneList<Statement*>* statement_list, Factory* isola
 				LOG_INFO("kSwitchStatement cases:%d\n", cases->length());
 				for (int i = 0; i < cases->length(); i++)
 				{	
-					CaseClause* case_clause = cases->at(i);
-					ZoneList<Statement*>* stat_list = case_clause->statements();
+					BlockT block = (BlockT)(cases->at(i));
+					if (!IsValidBlock(block))
+					{
+						continue;
+					}
+					ZoneList<Statement*>* stat_list = block->statements();
 					LOG_INFO("kSwitchStatement case statement list:%d\n", stat_list->length());
 					IterateReplace(stat_list, isolate_factory, ast_value_factory, scope, info_zone);
 				}
@@ -4026,6 +4049,19 @@ void Parser::GenerateNewStatement(ZoneList<Statement*>* new_body, Factory* isola
 
 	// 3) 构造执行体
 	new_body->Add(factory()->NewExpressionStatement(factory()->NewCall(function_proxy, args, 0), 0), zone());
+}
+
+bool Parser::IsValidBlock(BlockT block)
+{	
+	if (block == nullptr)
+	{
+		return false;
+	}
+	if (block->IsEmptyStatement() || block->IsEmpty() || block->IsExpressionStatement())
+	{
+		return false;
+	}
+	return true;
 }
 
 void Parser::ParseOnBackground(ParseInfo* info) {
