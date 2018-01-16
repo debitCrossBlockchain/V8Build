@@ -210,9 +210,11 @@ class V8_EXPORT_PRIVATE Parser : public NON_EXPORTED_BASE(ParserBase<Parser>) {
   bool Parse(ParseInfo* info);
 
   void UpdateCallList(ParseInfo* info);
-  void IterateReplace(ZoneList<Statement*>* statement_list, Factory* isolate_factory, AstValueFactory* ast_value_factory, Scope* scope, Zone* info_zone);
-  void GenerateNewStatement(ZoneList<Statement*>* new_body, Factory* isolate_factory, AstValueFactory* ast_value_factory, Scope* scope, Zone* info_zone);
+  void VisitWithBlock(Block* block);
+  void VisitWithStatementList(ZoneList<Statement*>* statement_list);
+  void PushNewStatement(ZoneList<Statement*>* result_statements);
   bool IsValidBlock(BlockT block);
+  void IterateReplaceIfstateNode(Statement* stmt);
 
   void ParseOnBackground(ParseInfo* info);
 
@@ -235,6 +237,24 @@ class V8_EXPORT_PRIVATE Parser : public NON_EXPORTED_BASE(ParserBase<Parser>) {
  private:
   friend class ParserBase<Parser>;
   friend class v8::internal::ExpressionClassifier<ParserTypes<Parser>>;
+
+  typedef struct tagGlobalFactory
+  {
+	  Factory* isolate_factory_;
+	  AstValueFactory* ast_value_factory_;
+	  Scope* scope_;
+	  Zone* info_zone_;
+
+	  tagGlobalFactory()
+	  {
+		  isolate_factory_ = nullptr;
+		  ast_value_factory_ = nullptr;
+		  scope_ = nullptr;
+		  info_zone_ = nullptr;
+	  }
+  }GlobalFactory;
+
+  GlobalFactory gloal_factory_;
 
   bool AllowsLazyParsingWithoutUnresolvedVariables() const {
     return scope()->AllowsLazyParsingWithoutUnresolvedVariables(

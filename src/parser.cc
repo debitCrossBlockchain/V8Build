@@ -3843,9 +3843,9 @@ void Parser::UpdateCallList(ParseInfo* info)
 		return;
 	}
 
-	//NewStringFromStaticChars 不会造成内存泄漏，是由 isolate 智能计数释放
-	Handle<String> bubi_string_name = info->isolate()->factory()->NewStringFromStaticChars("__enable_check_time__");
-	if (!bubi_string_name->Equals(script_name))
+	//NewStringFromStaticChars, isolate delete memory
+	Handle<String> check_string_name = info->isolate()->factory()->NewStringFromStaticChars("__enable_check_time__");
+	if (!check_string_name->Equals(script_name))
 	{
 		return;
 	}
@@ -3853,28 +3853,39 @@ void Parser::UpdateCallList(ParseInfo* info)
 	DCHECK_NOT_NULL(function);
 	Scope* scope = function->scope();
 	DCHECK_NOT_NULL(scope);
-	LOG_INFO("bubi script scope:%d\n", scope->scope_type());
+
 	if (!scope->is_script_scope() && !scope->is_eval_scope() && !scope->is_function_scope())
 	{
-		LOG_INFO("bubi-unkown script scope:%d\n", scope->scope_type());
+		LOG_INFO("v8-unkown script scope:%d\n", scope->scope_type());
 		return;
 	}
-	DeclarationScope* closure_scope = scope->GetClosureScope();
 
-	ZoneList<Statement*>* statement_list = function->body();
-	IterateReplace(statement_list, info->isolate()->factory(), info->ast_value_factory(), scope, info->zone());
+	gloal_factory_.ast_value_factory_ = info->ast_value_factory();
+	gloal_factory_.info_zone_ = info->zone();
+	gloal_factory_.isolate_factory_ = info->isolate()->factory();
+	gloal_factory_.scope_ = scope;
+
+	VisitWithStatementList(function->body());
 }
 
-void Parser::IterateReplace(ZoneList<Statement*>* statement_list, Factory* isolate_factory, AstValueFactory* ast_value_factory, Scope* scope, Zone* info_zone)
+void Parser::VisitWithBlock(Block* block)
 {
-	LOG_INFO("IterateReplace In, list len:%d, capacity:%d\n", statement_list->length(), statement_list->capacity());
+	if (!IsValidBlock(block))
+	{
+		return;
+	}
 	
+	VisitWithStatementList(block->statements());
+}
+
+void Parser::VisitWithStatementList(ZoneList<Statement*>* statement_list)
+{
+	LOG_INFO("VisitWithBlock In, list len:%d, capacity:%d\n", statement_list->length(), statement_list->capacity());
 	if (statement_list == nullptr || statement_list->capacity() <= 0 || statement_list->length() < 0)
 	{
 		return;
 	}
 
-	LOG_INFO("IterateReplace In, list size:%d\n", statement_list->length());
 	for (int i = 0; i < statement_list->length(); i++)
 	{
 		Statement* stmt = statement_list->at(i);
@@ -3883,172 +3894,145 @@ void Parser::IterateReplace(ZoneList<Statement*>* statement_list, Factory* isola
 			continue;
 		}
 		AstNode::NodeType note_type = stmt->node_type();
-		LOG_INFO("IterateReplace In for, note_type:%d\n", (int)note_type);
-		switch (note_type) 
+		LOG_INFO("VisitWithStatementList statement note_type:%d\n", (int)note_type);
+		switch (note_type)
 		{
 			case AstNode::kBlock:
 			{
-				LOG_INFO("bubi kBlock\n");
-				Block* block = stmt->AsBlock();
-				if (!IsValidBlock(block))
+				Block* body = stmt->AsBlock();
+				if (!IsValidBlock(body))
 				{
-					LOG_INFO("bubi invalid kBlock\n");
+					LOG_INFO("v8 invalid kBlock\n");
 					break;
 				}
 
-				ZoneList<Statement*>* stat_list = block->statements();
-				if (stat_list->length() > 1)
+				if (body->ignore_completion_value())
 				{
-					IterateReplace(stat_list, isolate_factory, ast_value_factory, scope, info_zone);
+					break;
 				}
-				break;
-			}
-			case AstNode::kExpressionStatement:
-			{
-				ExpressionStatement* expr_stmt = (ExpressionStatement*)stmt;
-				LOG_INFO("bubi kExpressionStatement\n");
-				break;
-			}
-			case AstNode::kEmptyStatement:
-			{
-				LOG_INFO("bubi kEmptyStatement\n");
+
+				if (body->statements()->length() > 1)
+				{
+					VisitWithBlock(body);
+				}
 				break;
 			}
 			case AstNode::kIfStatement:
 			{
 				IfStatement *if_stmt = (IfStatement*)stmt;
-				//then body
-				BlockT then_body = (BlockT)if_stmt->then_statement();
-				if (IsValidBlock(then_body))
-				{
-					bool isempty_statement = then_body->IsEmptyStatement();
-					ZoneList<Statement*>* then_stat_list = then_body->statements();
-					LOG_INFO("kIfStatement len:%d,isempty_statement:%d\n", then_stat_list->length(), isempty_statement);
-					IterateReplace(then_stat_list, isolate_factory, ast_value_factory, scope, info_zone);
-				}
-					
-				//else body
-				BlockT else_body = (BlockT)if_stmt->else_statement();
-				if (IsValidBlock(else_body))
-				{
-					ZoneList<Statement*>* else_stat_list = else_body->statements();
-					LOG_INFO("else_stat_list len:%d\n", else_stat_list->length());
-					IterateReplace(else_stat_list, isolate_factory, ast_value_factory, scope, info_zone);
-				}
-				break;
-			}
-			case AstNode::kReturnStatement:
-			{
-				LOG_INFO("bubi kReturnStatement\n");
+				IterateReplaceIfstateNode(if_stmt);
 				break;
 			}
 			case AstNode::kWhileStatement:
-			{
-				WhileStatement *while_stmt = (WhileStatement*)stmt;
-				BlockT body = (BlockT)while_stmt->body();
-				if (!IsValidBlock(body))
-				{ 
-					break;
-				}
-				ZoneList<Statement*>* stat_list = body->statements();
-				LOG_INFO("kWhileStatement len:%d\n", stat_list->length());
-				IterateReplace(stat_list, isolate_factory, ast_value_factory, scope, info_zone);
-				break;
-			}
 			case AstNode::kDoWhileStatement:
-			{
-				DoWhileStatement *dowhile_stmt = (DoWhileStatement*)stmt;
-				BlockT body = (BlockT)dowhile_stmt->body();
-				if (!IsValidBlock(body))
-				{
-					break;
-				}
-
-				ZoneList<Statement*>* stat_list = body->statements();
-				LOG_INFO("kDoWhileStatement len:%d\n", stat_list->length());
-				IterateReplace(stat_list, isolate_factory, ast_value_factory, scope, info_zone);
-				break;
-			}
 			case AstNode::kForStatement:
+			case AstNode::kForInStatement:
+			case AstNode::kForOfStatement:
 			{
-				ForStatement *for_stmt = (ForStatement*)stmt;
-				BlockT body = (BlockT)for_stmt->body();
-				if (!IsValidBlock(body))
-				{
-					break;
-				}
-				
-				ZoneList<Statement*>* stat_list = body->statements();
-				LOG_INFO("kForStatement len:%d, body node:%d\n", stat_list->length(), body->node_type());
-				IterateReplace(stat_list, isolate_factory, ast_value_factory, scope, info_zone);
+				VisitWithBlock((BlockT)((IterationStatement*)stmt)->body());
 				break;
 			}
-			case AstNode::kBreakStatement:
+			case AstNode::kTryCatchStatement:
 			{
-				LOG_INFO("bubi kBreakStatement\n");
+				VisitWithBlock((BlockT)((TryCatchStatement*)stmt)->try_block());
+				VisitWithBlock((BlockT)((TryCatchStatement*)stmt)->catch_block());
 				break;
 			}
-			case AstNode::kContinueStatement:
+			case AstNode::kTryFinallyStatement:
 			{
-				LOG_INFO("bubi kContinueStatement\n");
+				VisitWithBlock((BlockT)((TryFinallyStatement*)stmt)->try_block());
+				VisitWithBlock((BlockT)((TryFinallyStatement*)stmt)->finally_block());
 				break;
 			}
 			case AstNode::kSwitchStatement:
 			{
-				SwitchStatement *switch_stmt = (SwitchStatement*)stmt;
-				ZoneList<CaseClause*>* cases = switch_stmt->cases();
-				LOG_INFO("kSwitchStatement cases:%d\n", cases->length());
+				ZoneList<CaseClause*>* cases = ((SwitchStatement*)stmt)->cases();
 				for (int i = 0; i < cases->length(); i++)
-				{	
-					BlockT block = (BlockT)(cases->at(i));
-					if (!IsValidBlock(block))
-					{
-						continue;
-					}
-					ZoneList<Statement*>* stat_list = block->statements();
-					LOG_INFO("kSwitchStatement case statement list:%d\n", stat_list->length());
-					IterateReplace(stat_list, isolate_factory, ast_value_factory, scope, info_zone);
+				{
+					VisitWithBlock((BlockT)(cases->at(i)));
 				}
+				break;
+			}
+			case AstNode::kWithStatement:
+			{
+				VisitWithBlock((BlockT)((WithStatement*)stmt)->statement());
+				break;
+			}
+			case AstNode::kSloppyBlockFunctionStatement:
+			{
+				VisitWithBlock((BlockT)((SloppyBlockFunctionStatement*)stmt)->statement());
+				break;
+			}
+			case AstNode::kExpressionStatement:
+			case AstNode::kEmptyStatement:
+			case AstNode::kReturnStatement:
+			case AstNode::kBreakStatement:
+			case AstNode::kContinueStatement:
+			{
+				LOG_INFO("v8 ignore node type: %d\n", note_type);
 				break;
 			}
 			default:
 			{
-				LOG_INFO("bubi default astnote type: %d\n", note_type);
+				LOG_INFO("v8 default astnote type: %d\n", note_type);
 				break;
 			}
 		}
 	}
 
-	LOG_INFO("before GenerateNewStatement:%d\n", statement_list->length());
-	//通过 zone 自动分配和释放内存???  参考 class V8_EXPORT_PRIVATE Zone final  注释
-	ZoneList<Statement*>* new_statement_list = new(zone()) ZoneList<Statement*>(16, zone());
-	GenerateNewStatement(new_statement_list, isolate_factory, ast_value_factory, scope, info_zone);
-	for (int i = 0; i < statement_list->length(); i++)
-	{
-		new_statement_list->Add(statement_list->at(i), zone());
-	}
-	statement_list->Clear();
-	statement_list->AddAll(new_statement_list->ToVector(), zone());
-	LOG_INFO("after GenerateNewStatement:%d\n", statement_list->length());
+	PushNewStatement(statement_list);
 }
 
-void Parser::GenerateNewStatement(ZoneList<Statement*>* new_body, Factory* isolate_factory, AstValueFactory* ast_value_factory, Scope* scope, Zone* info_zone)
+void Parser::IterateReplaceIfstateNode(Statement* stmt)
 {
-	//添加新函数
-	//1、构造函数名字
-	Handle<String> func_string_name = isolate_factory->NewStringFromStaticChars("internal_check_time");
-	const AstRawString* func_name_string = ast_value_factory->GetString(func_string_name);
-	DCHECK(func_name_string != nullptr);
-	VariableProxy* function_proxy = scope->NewUnresolved(factory(), func_name_string); //内部仍然使用 zone 来分配空间
+	IfStatement *if_stmt = (IfStatement*)stmt;
+	//then body
+	if (if_stmt->HasThenStatement())
+	{
+		VisitWithBlock((BlockT)if_stmt->then_statement());
+	}
 
-	Handle<String> arg_string = isolate_factory->NewStringFromStaticChars("hello,bubi!");
-	const AstRawString* arg_name = ast_value_factory->GetString(arg_string);
+	if (if_stmt->HasElseStatement())
+	{
+		//else body
+		BlockT body = (BlockT)if_stmt->else_statement();
+		if (body->IsIfStatement())
+		{
+			IterateReplaceIfstateNode(body);
+		}
+		else if (IsValidBlock(body))
+		{
+			VisitWithBlock(body);
+		}
+	}
+}
+
+void Parser::PushNewStatement(ZoneList<Statement*>* result_statements)
+{
+	//LOG_INFO("before PushNewStatement:%d\n", result_statements->length());
+	
+	Handle<String> func_string_name = gloal_factory_.isolate_factory_->NewStringFromStaticChars("internal_check_time");
+	const AstRawString* func_name_string = gloal_factory_.ast_value_factory_->GetString(func_string_name);
+	DCHECK(func_name_string != nullptr);
+	VariableProxy* function_proxy = gloal_factory_.scope_->NewUnresolved(factory(), func_name_string);
+
+	Handle<String> arg_string = gloal_factory_.isolate_factory_->NewStringFromStaticChars("hello, v8!");
+	const AstRawString* arg_name = gloal_factory_.ast_value_factory_->GetString(arg_string);
 	ZoneList<Expression*>* args = new (zone()) ZoneList<Expression*>(1, zone());
 	Literal* msg = factory()->NewStringLiteral(arg_name, 0);
-	args->Add(msg, info_zone);
+	args->Add(msg, gloal_factory_.info_zone_);
 
-	// 3) 构造执行体
-	new_body->Add(factory()->NewExpressionStatement(factory()->NewCall(function_proxy, args, 0), 0), zone());
+	ZoneList<Statement*>* new_statement_list = new(zone()) ZoneList<Statement*>(16, zone());
+	new_statement_list->Add(factory()->NewExpressionStatement(factory()->NewCall(function_proxy, args, 0), 0), zone());
+
+	for (int i = 0; i < result_statements->length(); i++)
+	{
+		new_statement_list->Add(result_statements->at(i), zone());
+	}
+
+	result_statements->Clear();
+	result_statements->AddAll(new_statement_list->ToVector(), zone());
+	//LOG_INFO("after PushNewStatement:%d\n", result_statements->length());
 }
 
 bool Parser::IsValidBlock(BlockT block)
@@ -4057,10 +4041,12 @@ bool Parser::IsValidBlock(BlockT block)
 	{
 		return false;
 	}
+
 	if (block->IsEmptyStatement() || block->IsEmpty() || block->IsExpressionStatement())
 	{
 		return false;
 	}
+
 	return true;
 }
 

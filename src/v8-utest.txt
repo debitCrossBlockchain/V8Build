@@ -1,3 +1,11 @@
+3,function Lakers(){this.name="kobe bryant";this.age="28";this.gender="boy"}var people=new Lakers();with(people){var str="name: "+name+"<br>";str+="age："+age+"<br>";str+="sex："+gender;print(str)}
+4,try{print("try");print("try")}catch(error){print("catch");print("catch");print("catch")}finally{print("finally ");print("finally ");print("finally ");print("finally ")}
+4,try{print("try")}catch(error){print("catch")}finally{print("finally ")}
+2,try{print("try")}catch(error){print("catch")}
+5,var arryAll=[];arryAll.push(1);arryAll.push(2);arryAll.push(3);arryAll.push(4);function t1(arg){print(arg)}arryAll.forEach(t1,arryAll);
+13,var uniqueWords=new Set("abcd");for(var word of uniqueWords){print(word)}
+4,var a={"first":1,"second":2,"third":3};for(var i in a){print(a[i])}print("aaa");
+4,var i=1;do{if(i<=0){break}i--;print("a")}while(true);
 1,var a = 4; var b = a ; print(a);
 2,for(var i=1;i<=1;i++){print("a");print("b");print("c")}print("aaa");print("bbb")
 6,for(var i=1;i<=5;i++){print("a")}print("aaa");
@@ -21,3 +29,4 @@
 11,function Biology(){function privateMethod(){return'私有方法'}var privateProperty='私有属性';this.publicProperty='实例属性';Biology.prototype.staticProperty='原型属性';var privateMethod=function(){return'私有方法'};this.publicMethod=function(){return'实例方法'};Biology.prototype.staticMethod=function(){return'原型方法'};this.getPrivateProperty=function(){return privateProperty};this.setPrivateProperty=function(property){privateProperty=property};this.getPrivateMethod=function(){return privateMethod()}}var biology=new Biology();var biology_2=new Biology();biology.publicProperty='修改后的实例属性';biology.setPrivateProperty('改变后的私有属性');print(biology.getPrivateProperty());Biology.prototype.staticProperty='修改后的原型属性';print(biology.staticProperty);print(biology_2.staticProperty);print(biology.privateMethod);print(biology.publicMethod());print(biology.getPrivateMethod());print(biology.staticMethod());Biology.prototype.staticMethod=function(){return'修改后的原型方法'};print(biology.staticMethod());print(biology_2.staticMethod());
 5,function Biology(age){this.age=age};Biology.prototype={constructor:Biology,name:'biology',printAll:function(){print(this.name+':'+this.age)}};var biology_1=new Biology(16);var biology_2=new Biology(18);biology_1.printAll();biology_2.printAll();
 11,function Biology(){function privateMethod(){return'私有方法'}var privateProperty='私有属性';this.publicProperty='实例属性';Biology.prototype.staticProperty='原型属性';var privateMethod=function(){return'私有方法'};this.publicMethod=function(){return'实例方法'};Biology.prototype.staticMethod=function(){return'原型方法'};this.getPrivateProperty=function(){return privateProperty};this.setPrivateProperty=function(property){privateProperty=property};this.getPrivateMethod=function(){return privateMethod()}}var biology=new Biology();var biology_2=new Biology();biology.publicProperty='修改后的实例属性';biology.setPrivateProperty('改变后的私有属性');print(biology.getPrivateProperty());Biology.prototype.staticProperty='修改后的原型属性';print(biology.staticProperty);print(biology_2.staticProperty);print(biology.privateMethod);print(biology.publicMethod());print(biology.getPrivateMethod());print(biology.staticMethod());Biology.prototype.staticMethod=function(){return'修改后的原型方法'};print(biology.staticMethod());print(biology_2.staticMethod());
+8,include(); x = new Big('18446744073709551615'); print(x);
