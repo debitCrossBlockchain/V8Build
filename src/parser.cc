@@ -4041,8 +4041,10 @@ bool Parser::IsValidBlock(BlockT block)
 	{
 		return false;
 	}
-
-	if (block->IsEmptyStatement() || block->IsEmpty() || block->IsExpressionStatement())
+	
+	if (block->IsEmptyStatement() || block->IsEmpty() || block->IsExpressionStatement()
+		|| block->IsReturnStatement() || block->IsAssignment() || block->IsBreakStatement()
+		|| block->IsExpressionStatement() || block->IsContinueStatement())
 	{
 		return false;
 	}

@@ -39,7 +39,8 @@
 #include <utility>      // std::pair
 #include <iostream>     // std::cout
 #include<stdio.h>
-
+#include <time.h> 
+#include <stdio.h> 
 #include <cstdio>
 
 #ifdef WIN32
@@ -57,8 +58,38 @@
 #endif
 
 #define RUN_UTEST
-int g_repetition_count = 1;
-int g_check_time_count = 0;
+#define USE_MEM_MONITOR
+#define USE_CHECK_TIME
+#define USE_NEW_IOSLATE
+
+#ifdef USE_CHECK_TIME
+char check_time[100] = "__enable_check_time__";
+#else
+char check_time[100] = { 0 };
+#endif
+
+int g_repetition_count = 10000;
+unsigned int g_check_time_count = 0;
+
+#if 0
+#define LOG_INFO printf
+#else
+void shell_no_printf(const char* format, ...) {}
+#define LOG_INFO shell_no_printf
+#endif
+
+std::map<std::string, std::string> file_script_map_;
+
+static int64_t Stoi64(const std::string &str) 
+{
+	int64_t v = 0;
+#ifdef WIN32
+	sscanf_s(str.c_str(), "%lld", &v);
+#else
+	sscanf(str.c_str(), "%ld", &v);
+#endif
+	return v;
+}
 
 /**
  * This sample program shows how to implement a simple javascript shell
@@ -79,6 +110,7 @@ bool ExecuteString(v8::Isolate* isolate, v8::Local<v8::String> source,
                    bool report_exceptions);
 void Print(const v8::FunctionCallbackInfo<v8::Value>& args);
 void CheckTime(const v8::FunctionCallbackInfo<v8::Value>& args);
+void Add(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Include(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Read(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Load(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -86,6 +118,16 @@ void Quit(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Version(const v8::FunctionCallbackInfo<v8::Value>& args);
 v8::MaybeLocal<v8::String> ReadFile(v8::Isolate* isolate, const char* name);
 void ReportException(v8::Isolate* isolate, v8::TryCatch* handler);
+
+static const char* last_location;
+static const char* last_message;
+void StoringErrorCallback(const char* location, const char* message) {
+	if (last_location == NULL) {
+		last_location = location;
+		last_message = message;
+	}
+	printf("location:%s, message:%s\n", location, message);
+}
 
 
 static bool run_shell;
@@ -98,54 +140,114 @@ int Repetition(int argc, char* argv[])
 	v8::V8::InitializePlatform(platform);
 	v8::V8::Initialize();
 	v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
+
+	time_t start_t = time(0);
+	char start_tmp[64];
+	strftime(start_tmp, sizeof(start_tmp), "%Y/%m/%d %X", localtime(&start_t));
+	printf("Utest start time:%s\n", start_tmp);
+	int result;
 	v8::Isolate::CreateParams create_params;
 	create_params.array_buffer_allocator =
 		v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+	/*create_params.constraints.set_code_range_size(512);
+	create_params.constraints.set_max_executable_size(2 * 1024);
+	create_params.constraints.set_max_old_space_size(2 * 1024);
+	create_params.constraints.set_max_semi_space_size(512);*/
+#ifndef USE_NEW_IOSLATE
 	v8::Isolate* isolate = v8::Isolate::New(create_params);
+	isolate->SetFatalErrorHandler(StoringErrorCallback);
+#endif
 
-	int result;
+	last_location = last_message = NULL;
 	for (int i = 0; i < g_repetition_count; i++)
 	{
-#ifdef WIN32
-		Sleep(10);
-#else
-		usleep(10 * 1000);
+#ifdef USE_NEW_IOSLATE
+		v8::Isolate* isolate = v8::Isolate::New(create_params);
+		isolate->SetFatalErrorHandler(StoringErrorCallback);
 #endif
-		v8::Isolate::Scope isolate_scope(isolate);
-		v8::HandleScope handle_scope(isolate);
-		v8::Local<v8::Context> context = CreateShellContext(isolate);
-		run_shell = (argc == 1);
 		{
-			
-			if (context.IsEmpty()) {
-				fprintf(stderr, "Error creating context\n");
-				return 1;
-			}
-			v8::Context::Scope context_scope(context);
-			result = RunMain(isolate, platform, argc, argv);
+			v8::Isolate::Scope isolate_scope(isolate);
+			v8::HandleScope handle_scope(isolate);
+			v8::Local<v8::Context> context = CreateShellContext(isolate);
+			run_shell = (argc == 1);
+			{
+
+				if (context.IsEmpty()) {
+					fprintf(stderr, "Error creating context\n");
+					return 1;
+				}
+				v8::Context::Scope context_scope(context);
+				result = RunMain(isolate, platform, argc, argv);
 #ifdef RUN_UTEST
-			RunUtest(context, platform);
+				RunUtest(context, platform);
 #else
-			if (run_shell) RunShell(context, platform);
+				if (run_shell) RunShell(context, platform);
 #endif
+			}
 		}
-		
+
+#ifdef USE_NEW_IOSLATE
+		isolate->Dispose();
+#endif
 	}
+	
+	delete create_params.array_buffer_allocator;
+	time_t end_t = time(0);
+	char end_tmp[64];
+	strftime(end_tmp, sizeof(end_tmp), "%Y/%m/%d %X", localtime(&end_t));
+	printf("Utest end time:%s\n", end_tmp);
 
 	char buffer[10000];
 	char* str = fgets(buffer, 10000, stdin);
-
+#ifndef USE_NEW_IOSLATE
 	isolate->Dispose();
+#endif
+
 	v8::V8::Dispose();
 	v8::V8::ShutdownPlatform();
 	delete platform;
-	delete create_params.array_buffer_allocator;
+	
 	return result;
+}
+
+void ReadScriptFromFile(std::string file_name)
+{
+	FILE * stream = nullptr;
+	if (stream == nullptr)
+	{
+		printf("open file %s\n", file_name.c_str());
+		stream = fopen(file_name.data(), "rb");
+	}
+	if (stream == nullptr)
+	{
+		printf("cannot find %s\n", file_name.c_str());
+		return;
+	}
+	std::string str;
+	if (str.empty())
+	{
+		fseek(stream, 0, SEEK_END);
+		size_t len = ftell(stream);
+		char *buffer = new char[len + 1];
+		memset(buffer, 0, len + 1);
+		fseek(stream, 0, SEEK_SET);
+		fread(buffer, len, 1, stream);
+		std::string str_temp(buffer, len);
+		str = str_temp;
+	}
+
+	fclose(stream);
+
+	file_script_map_[file_name] = str;
 }
 
 int main(int argc, char* argv[]) 
 {
-	return Repetition(argc, argv);;
+	ReadScriptFromFile("adsafe_dep.js");
+	ReadScriptFromFile("big.js");
+	ReadScriptFromFile("adsafe.js");
+	ReadScriptFromFile("jslint.js");
+	return Repetition(argc, argv);
 }
 
 
@@ -171,6 +273,12 @@ v8::Local<v8::Context> CreateShellContext(v8::Isolate* isolate) {
 	  v8::String::NewFromUtf8(isolate, "internal_check_time", v8::NewStringType::kNormal)
 	  .ToLocalChecked(),
 	  v8::FunctionTemplate::New(isolate, CheckTime));
+
+  // Bind the global 'check_time' function to the C++ Add callback.
+  global->Set(
+	  v8::String::NewFromUtf8(isolate, "internal_add", v8::NewStringType::kNormal)
+	  .ToLocalChecked(),
+	  v8::FunctionTemplate::New(isolate, Add));
 
   global->Set(
 	  v8::String::NewFromUtf8(isolate, "include", v8::NewStringType::kNormal)
@@ -227,10 +335,46 @@ void Print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 // spaces and ending with a newline.
 void CheckTime(const v8::FunctionCallbackInfo<v8::Value>& args) {
 #ifndef RUN_UTEST
-	printf("internal_check_time\n");
+	LOG_INFO("internal_check_time\n");
 #endif
 	g_check_time_count++;
 
+#ifdef USE_MEM_MONITOR
+	v8::HeapStatistics stats;
+	args.GetIsolate()->GetHeapStatistics(&stats);
+	/*  printf("%u,%u,%u,%u,%u,%u,%u,%u,%u\n", stats.does_zap_garbage(), stats.heap_size_limit(), stats.malloced_memory(), stats.peak_malloced_memory(), stats.total_available_size(),
+	stats.total_heap_size(), stats.total_heap_size_executable(), stats.total_physical_size(), stats.used_heap_size());*/
+	LOG_INFO("limite:%u, used:%u\n", (unsigned int)stats.heap_size_limit(), (unsigned int)stats.used_heap_size());
+	//printf("context->EstimatedSize:%d\n", context->EstimatedSize());
+#endif
+
+	return;
+}
+
+void Add(const v8::FunctionCallbackInfo<v8::Value>& args) 
+{
+	if (args.Length() != 2) 
+	{
+		args.GetIsolate()->ThrowException(
+			v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
+			v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	char add_result[100] = {0};
+
+	v8::String::Utf8Value add_1(args[0]);
+	v8::String::Utf8Value add_2(args[1]);
+	
+	int64_t add_int64_result = Stoi64(*add_1) + Stoi64(*add_2);
+#ifdef WIN32
+	sprintf(add_result, "%lld", add_int64_result);
+#else
+	sprintf(add_result, "%ld", add_int64_result);
+#endif
+
+	v8::Local<v8::String> result(v8::String::NewFromUtf8(args.GetIsolate(), add_result, v8::NewStringType::kNormal).ToLocalChecked());
+	args.GetReturnValue().Set(result);
 	return;
 }
 
@@ -240,48 +384,28 @@ void Include(const v8::FunctionCallbackInfo<v8::Value>& args)
 	// Enter the execution environment before evaluating any code.
 	v8::Context::Scope context_scope(context);
 
-	std::string file_name = "D:\\Workspace\\v8\\v8-2018-01-04\\v8\\samples\\big.js";
-	static FILE * stream = fopen(file_name.data(), "rb");
-	if (stream == nullptr)
-	{
-		printf("cannot find %s\n", file_name.c_str());
+	if (args.Length() != 1) {
+		LOG_INFO("Include parameter error, args length(%d) not equal 1\n", args.Length());
+		args.GetReturnValue().Set(false);
 		return;
 	}
-	fseek(stream, 0, SEEK_END);
-	size_t len = ftell(stream);
-	char *buffer = new char[len + 1];
-	memset(buffer, 0, len + 1);
-	fseek(stream, 0, SEEK_SET);
-	fread(buffer, len, 1, stream);
-	//__enable_check_time__
-	v8::Local<v8::String> name(v8::String::NewFromUtf8(context->GetIsolate(), "__enable_check_time__", v8::NewStringType::kNormal).ToLocalChecked());
-	std::string str(buffer, len);
-	ExecuteString(context->GetIsolate(), v8::String::NewFromUtf8(context->GetIsolate(), str.data(), v8::NewStringType::kNormal).ToLocalChecked(), name, true, true);
-	
-	//do {
 
-	//	v8::TryCatch try_catch(args.GetIsolate());
-	//	std::string js_file = "";
+	if (!args[0]->IsString()) {
+		LOG_INFO("Include parameter error, parameter should be a String\n");
+		args.GetReturnValue().Set(false);
+		return;
+	}
+	v8::String::Utf8Value str(args[0]);
+	std::map<std::string, std::string>::iterator find_source = file_script_map_.find(*str);
+	if (find_source == file_script_map_.end()) {
+		LOG_INFO("Can't find the include file(%s) in jslib directory\n", *str);
+		args.GetReturnValue().Set(false);
+		return;
+	}
+	std::string js_file = find_source->second;
 
-	//	v8::Local<v8::String> source = v8::String::NewFromUtf8(args.GetIsolate(), js_file.c_str());
-	//	v8::Local<v8::Script> script;
-
-	//	v8::Local<v8::String> check_time_name(
-	//		v8::String::NewFromUtf8(args.GetIsolate()->GetCurrentContext()->GetIsolate(), "__enable_check_time__",
-	//		v8::NewStringType::kNormal).ToLocalChecked());
-	//	v8::ScriptOrigin origin_check_time_name(check_time_name);
-
-	//	if (!v8::Script::Compile(args.GetIsolate()->GetCurrentContext(), source, &origin_check_time_name).ToLocal(&script)) {
-	//		ReportException(args.GetIsolate(), &try_catch);
-	//		break;
-	//	}
-
-	//	v8::Local<v8::Value> result;
-	//	if (!script->Run(args.GetIsolate()->GetCurrentContext()).ToLocal(&result)) {
-	//		ReportException(args.GetIsolate(), &try_catch);
-	//	}
-	//} while (false);
-	//return v8::Undefined(args.GetIsolate());
+	v8::Local<v8::String> name(v8::String::NewFromUtf8(context->GetIsolate(), check_time, v8::NewStringType::kNormal).ToLocalChecked());
+	ExecuteString(context->GetIsolate(), v8::String::NewFromUtf8(context->GetIsolate(), js_file.data(), v8::NewStringType::kNormal).ToLocalChecked(), name, true, true);
 }
 
 
@@ -443,13 +567,15 @@ void RunShell(v8::Local<v8::Context> context, v8::Platform* platform) {
   // Enter the execution environment before evaluating any code.
   v8::Context::Scope context_scope(context);
   v8::Local<v8::String> name(
-      v8::String::NewFromUtf8(context->GetIsolate(), "__enable_check_time__",
+	  v8::String::NewFromUtf8(context->GetIsolate(), check_time,
                               v8::NewStringType::kNormal).ToLocalChecked());
   while (true) {
     char buffer[kBufferSize];
     fprintf(stderr, "> ");
     char* str = fgets(buffer, kBufferSize, stdin);
     if (str == NULL) break;
+	std::string str_target(str);
+	if (str_target.compare("exit\n") == 0) break;
     v8::HandleScope handle_scope(context->GetIsolate());
     ExecuteString(
         context->GetIsolate(),
@@ -473,8 +599,7 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 	
 	if (split_cases.empty())
 	{
-		//std::string file_name = "v8-utest.txt";
-		std::string file_name = "D:\\Workspace\\v8\\v8-2018-01-04\\v8\\build\\Debug\\v8-utest.txt";
+		std::string file_name = "v8-utest.txt";
 		static FILE * stream = fopen(file_name.data(), "r");
 		
 		if (stream == nullptr)
@@ -508,7 +633,7 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 		}
 	}
 
-	fprintf(stderr, "-----------------------Utest Start------------------------------------------------\n");
+	LOG_INFO("-----------------------Utest Start------------------------------------------------\n");
 	static const int kBufferSize = 10 * 1024;
 	// Enter the execution environment before evaluating any code.
 	for (unsigned int i = 0; i < split_cases.size(); i++)
@@ -519,7 +644,7 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 
 		v8::Context::Scope context_scope(context);
 		v8::Local<v8::String> name(
-			v8::String::NewFromUtf8(context->GetIsolate(), "__enable_check_time__",
+			v8::String::NewFromUtf8(context->GetIsolate(), check_time,
 			v8::NewStringType::kNormal).ToLocalChecked());
 
 		char buffer[kBufferSize];
@@ -531,9 +656,9 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 			v8::NewStringType::kNormal).ToLocalChecked(),
 			name, true, true);
 		
-		if (g_check_time_count == expect_result)
+		if (g_check_time_count == (unsigned int)expect_result)
 		{
-			printf("-----------------------Utest [%d] OK.[expect:%d, true result:%d]----------------------\n", i + 1, expect_result, g_check_time_count);
+			LOG_INFO("-----------------------Utest [%d] OK.[expect:%d, true result:%u]----------------------\n", i + 1, expect_result, g_check_time_count);
 		}
 		else
 		{
@@ -541,8 +666,9 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 			HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
 			SetConsoleTextAttribute(handle, FOREGROUND_INTENSITY | FOREGROUND_RED);
 #endif
-			printf("-----------------------Src: %s\n", script_src.c_str());
-			printf("-----------------------Utest [%d] ERR.[expect:%d, true result:%d]----------------------\n", i + 1, expect_result, g_check_time_count);
+			LOG_INFO("-----------------------Src: %s\n", script_src.c_str());
+			LOG_INFO("-----------------------Utest [%d] ERR.[expect:%d, true result:%u]----------------------\n", i + 1, expect_result, g_check_time_count);
+			g_check_time_count = 0;
 			break;
 		}
 		//assert(g_check_time_count == expect_result);
@@ -550,7 +676,7 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 		g_check_time_count = 0;
 	}
 
-	fprintf(stderr, "\n-----------------------Utest End------------------------------------------------\n");
+	LOG_INFO("\n-----------------------Utest End------------------------------------------------\n");
 }
 
 // Executes a string within the current v8 context.
@@ -561,7 +687,7 @@ bool ExecuteString(v8::Isolate* isolate, v8::Local<v8::String> source,
   v8::TryCatch try_catch(isolate);
   v8::ScriptOrigin origin(name);
   v8::Local<v8::Context> context(isolate->GetCurrentContext());
-  context->SetEmbedderData(8888, v8::Number::New(isolate, 8888));
+  
   v8::Local<v8::Script> script;
   if (!v8::Script::Compile(context, source, &origin).ToLocal(&script)) {
     // Print errors that happened during compilation.
@@ -585,8 +711,16 @@ bool ExecuteString(v8::Isolate* isolate, v8::Local<v8::String> source,
         const char* cstr = ToCString(str);
         //printf("run result:  %s\n", cstr);
       }
+	  v8::HeapStatistics stats;
+	  isolate->GetHeapStatistics(&stats);
+	  /*  printf("%u,%u,%u,%u,%u,%u,%u,%u,%u\n", stats.does_zap_garbage(), stats.heap_size_limit(), stats.malloced_memory(), stats.peak_malloced_memory(), stats.total_available_size(),
+			stats.total_heap_size(), stats.total_heap_size_executable(), stats.total_physical_size(), stats.used_heap_size());*/
+	  //printf("limite:%u, used:%u\n", stats.heap_size_limit(), stats.used_heap_size());
+	  //printf("context->EstimatedSize:%d\n", context->EstimatedSize());
       return true;
     }
+	//isolate->RequestInterrupt();
+	
   }
 }
 
