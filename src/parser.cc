@@ -3980,7 +3980,7 @@ void Parser::VisitWithStatementList(ZoneList<Statement*>* statement_list)
 		}
 	}
 
-	PushNewStatement(statement_list);
+	PushStatementList(statement_list);
 }
 
 void Parser::IterateReplaceIfstateNode(Statement* stmt)
@@ -4007,32 +4007,41 @@ void Parser::IterateReplaceIfstateNode(Statement* stmt)
 	}
 }
 
-void Parser::PushNewStatement(ZoneList<Statement*>* result_statements)
+void Parser::PushStatementList(ZoneList<Statement*>* statements)
 {
+	ZoneList<Statement*>* new_statement_list = new(zone()) ZoneList<Statement*>(16, zone());
 	//LOG_INFO("before PushNewStatement:%d\n", result_statements->length());
-	
+	bool is_first = true;
+	if (!statements->is_empty())
+	{
+		for (int i = 0; i < statements->length(); i++)
+		{
+			PushStatementObj(new_statement_list, is_first);
+			new_statement_list->Add(statements->at(i), zone());
+			is_first = false;
+		}
+	}
+	else
+	{
+		PushStatementObj(new_statement_list, is_first);
+	}
+
+	statements->Clear();
+	statements->AddAll(new_statement_list->ToVector(), zone());
+	//LOG_INFO("after PushNewStatement:%d\n", result_statements->length());
+}
+
+void Parser::PushStatementObj(ZoneList<Statement*>* statements, bool is_block_first)
+{
 	Handle<String> func_string_name = gloal_factory_.isolate_factory_->NewStringFromStaticChars("internal_check_time");
 	const AstRawString* func_name_string = gloal_factory_.ast_value_factory_->GetString(func_string_name);
 	DCHECK(func_name_string != nullptr);
 	VariableProxy* function_proxy = gloal_factory_.scope_->NewUnresolved(factory(), func_name_string);
 
-	Handle<String> arg_string = gloal_factory_.isolate_factory_->NewStringFromStaticChars("hello, v8!");
-	const AstRawString* arg_name = gloal_factory_.ast_value_factory_->GetString(arg_string);
 	ZoneList<Expression*>* args = new (zone()) ZoneList<Expression*>(1, zone());
-	Literal* msg = factory()->NewStringLiteral(arg_name, 0);
+	Literal* msg = factory()->NewBooleanLiteral(is_block_first, 0);
 	args->Add(msg, gloal_factory_.info_zone_);
-
-	ZoneList<Statement*>* new_statement_list = new(zone()) ZoneList<Statement*>(16, zone());
-	new_statement_list->Add(factory()->NewExpressionStatement(factory()->NewCall(function_proxy, args, 0), 0), zone());
-
-	for (int i = 0; i < result_statements->length(); i++)
-	{
-		new_statement_list->Add(result_statements->at(i), zone());
-	}
-
-	result_statements->Clear();
-	result_statements->AddAll(new_statement_list->ToVector(), zone());
-	//LOG_INFO("after PushNewStatement:%d\n", result_statements->length());
+	statements->Add(factory()->NewExpressionStatement(factory()->NewCall(function_proxy, args, 0), 0), zone());
 }
 
 bool Parser::IsValidBlock(BlockT block)

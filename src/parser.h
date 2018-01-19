@@ -212,7 +212,8 @@ class V8_EXPORT_PRIVATE Parser : public NON_EXPORTED_BASE(ParserBase<Parser>) {
   void UpdateCallList(ParseInfo* info);
   void VisitWithBlock(Block* block);
   void VisitWithStatementList(ZoneList<Statement*>* statement_list);
-  void PushNewStatement(ZoneList<Statement*>* result_statements);
+  void PushStatementList(ZoneList<Statement*>* statements);
+  void PushStatementObj(ZoneList<Statement*>* statements, bool is_block_first);
   bool IsValidBlock(BlockT block);
   void IterateReplaceIfstateNode(Statement* stmt);
 

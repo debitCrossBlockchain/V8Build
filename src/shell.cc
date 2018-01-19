@@ -69,7 +69,8 @@ char check_time[100] = { 0 };
 #endif
 
 int g_repetition_count = 10000;
-unsigned int g_check_time_count = 0;
+unsigned int g_check_block_time_count = 0;
+unsigned int g_check_all_time_count = 0;
 
 #if 0
 #define LOG_INFO printf
@@ -337,14 +338,21 @@ void CheckTime(const v8::FunctionCallbackInfo<v8::Value>& args) {
 #ifndef RUN_UTEST
 	LOG_INFO("internal_check_time\n");
 #endif
-	g_check_time_count++;
 
+	v8::String::Utf8Value is_first_org(args[0]);
+	std::string is_first_src = *is_first_org;
+	bool is_first = (is_first_src.compare("true") == 0 )? true : false;
+	if (is_first)
+	{
+		g_check_block_time_count++;
+	}
+	g_check_all_time_count++;
 #ifdef USE_MEM_MONITOR
 	v8::HeapStatistics stats;
 	args.GetIsolate()->GetHeapStatistics(&stats);
 	/*  printf("%u,%u,%u,%u,%u,%u,%u,%u,%u\n", stats.does_zap_garbage(), stats.heap_size_limit(), stats.malloced_memory(), stats.peak_malloced_memory(), stats.total_available_size(),
 	stats.total_heap_size(), stats.total_heap_size_executable(), stats.total_physical_size(), stats.used_heap_size());*/
-	LOG_INFO("limite:%u, used:%u\n", (unsigned int)stats.heap_size_limit(), (unsigned int)stats.used_heap_size());
+	//LOG_INFO("limite:%u, used:%u\n", (unsigned int)stats.heap_size_limit(), (unsigned int)stats.used_heap_size());
 	//printf("context->EstimatedSize:%d\n", context->EstimatedSize());
 #endif
 
@@ -592,7 +600,8 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 {
 	typedef struct tagSplitCase
 	{
-		int expect_result;
+		int expect_block_result;
+		int expect_all_result;
 		std::string str;
 	}SplitCase;
 	static std::vector<SplitCase> split_cases;
@@ -627,8 +636,15 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 				continue;
 			}
 			SplitCase one_case;
-			one_case.expect_result = atoi(scrpit_all.substr(0, idx).data());
-			one_case.str = scrpit_all.substr(idx + 1, std::string::npos);
+			one_case.expect_block_result = atoi(scrpit_all.substr(0, idx).data());
+			size_t idx_2 = scrpit_all.find(',', idx + 1);
+			if (idx_2 == std::string::npos)
+			{
+				printf("error script [index:%d] :%s", i + 1, scrpit_all.c_str());
+				continue;
+			}
+			one_case.expect_all_result = atoi(scrpit_all.substr(idx + 1, idx_2 + 1).data());
+			one_case.str = scrpit_all.substr(idx_2 + 1, std::string::npos);
 			split_cases.push_back(one_case);
 		}
 	}
@@ -639,7 +655,8 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 	for (unsigned int i = 0; i < split_cases.size(); i++)
 	{
 		const SplitCase &one_case = split_cases[i];
-		int expect_result = one_case.expect_result;
+		int expect_block_result = one_case.expect_block_result;
+		int expect_all_result = one_case.expect_all_result;
 		std::string script_src = one_case.str;
 
 		v8::Context::Scope context_scope(context);
@@ -656,9 +673,11 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 			v8::NewStringType::kNormal).ToLocalChecked(),
 			name, true, true);
 		
-		if (g_check_time_count == (unsigned int)expect_result)
+		if ((g_check_block_time_count == (unsigned int)expect_block_result) 
+			&& (g_check_all_time_count == (unsigned int)expect_all_result))
 		{
-			LOG_INFO("-----------------------Utest [%d] OK.[expect:%d, true result:%u]----------------------\n", i + 1, expect_result, g_check_time_count);
+			LOG_INFO("-----------------------Utest [%d] OK.[expect,true] [%d,%u] [%d, %u]----------------------\n", 
+				i + 1, expect_block_result, g_check_block_time_count, expect_all_result, g_check_all_time_count);
 		}
 		else
 		{
@@ -667,13 +686,16 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 			SetConsoleTextAttribute(handle, FOREGROUND_INTENSITY | FOREGROUND_RED);
 #endif
 			LOG_INFO("-----------------------Src: %s\n", script_src.c_str());
-			LOG_INFO("-----------------------Utest [%d] ERR.[expect:%d, true result:%u]----------------------\n", i + 1, expect_result, g_check_time_count);
-			g_check_time_count = 0;
+			LOG_INFO("-----------------------Utest [%d] ERR.[expect,true] [%d,%u] [%d, %u]----------------------\n",
+				i + 1, expect_block_result, g_check_block_time_count, expect_all_result, g_check_all_time_count);
+			g_check_block_time_count = 0;
+			g_check_all_time_count = 0;
 			break;
 		}
-		//assert(g_check_time_count == expect_result);
+		//assert(g_check_block_time_count == expect_result);
 		
-		g_check_time_count = 0;
+		g_check_block_time_count = 0;
+		g_check_all_time_count = 0;
 	}
 
 	LOG_INFO("\n-----------------------Utest End------------------------------------------------\n");
