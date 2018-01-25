@@ -581,7 +581,7 @@ int RunMain(v8::Isolate* isolate, v8::Platform* platform, int argc,
 // The read-eval-execute loop of the shell.
 void RunShell(v8::Local<v8::Context> context, v8::Platform* platform) {
   fprintf(stderr, "V8 version %s [sample shell]\n", v8::V8::GetVersion());
-  static const int kBufferSize = 1000 * 1000;
+  static const int kBufferSize = 100 * 1000;
   // Enter the execution environment before evaluating any code.
   v8::Context::Scope context_scope(context);
   v8::Local<v8::String> name(
