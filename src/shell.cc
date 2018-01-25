@@ -248,6 +248,7 @@ int main(int argc, char* argv[])
 	ReadScriptFromFile("big.js");
 	ReadScriptFromFile("adsafe.js");
 	ReadScriptFromFile("jslint.js");
+	ReadScriptFromFile("test.js");
 	return Repetition(argc, argv);
 }
 
@@ -323,6 +324,15 @@ void Print(const v8::FunctionCallbackInfo<v8::Value>& args) {
     } else {
       printf(" ");
     }
+
+	{
+		if (args[i]->IsObject()) {  //include map arrary
+			v8::Local<v8::String> jsStr = v8::JSON::Stringify(args.GetIsolate()->GetCurrentContext(), args[i]->ToObject()).ToLocalChecked();
+			std::string str = std::string(ToCString(v8::String::Utf8Value(jsStr)));
+			LOG_INFO("%s\n", str.c_str());
+		}
+	}
+
     v8::String::Utf8Value str(args[i]);
     const char* cstr = ToCString(str);
     printf("%s", cstr);
@@ -336,7 +346,7 @@ void Print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 // spaces and ending with a newline.
 void CheckTime(const v8::FunctionCallbackInfo<v8::Value>& args) {
 #ifndef RUN_UTEST
-	LOG_INFO("internal_check_time\n");
+	LOG_INFO("internal_check_time:%d, block:%d\n", g_check_all_time_count, g_check_block_time_count);
 #endif
 
 	v8::String::Utf8Value is_first_org(args[0]);
@@ -571,7 +581,7 @@ int RunMain(v8::Isolate* isolate, v8::Platform* platform, int argc,
 // The read-eval-execute loop of the shell.
 void RunShell(v8::Local<v8::Context> context, v8::Platform* platform) {
   fprintf(stderr, "V8 version %s [sample shell]\n", v8::V8::GetVersion());
-  static const int kBufferSize = 100 * 1000;
+  static const int kBufferSize = 1000 * 1000;
   // Enter the execution environment before evaluating any code.
   v8::Context::Scope context_scope(context);
   v8::Local<v8::String> name(

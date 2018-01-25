@@ -1,4 +1,4 @@
-function A() {
+function hello() {
     print("a");
     print("a");
     print("a");
@@ -6538,4 +6538,3 @@ function A() {
     print("a");
     print("a");
 }
-A();
