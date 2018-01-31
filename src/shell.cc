@@ -348,7 +348,13 @@ void CheckTime(const v8::FunctionCallbackInfo<v8::Value>& args) {
 #ifndef RUN_UTEST
 	LOG_INFO("internal_check_time:%d, block:%d\n", g_check_all_time_count, g_check_block_time_count);
 #endif
-
+	if (g_check_all_time_count % 100000 == 0)
+	{
+		//printf("%d\n", g_check_all_time_count);
+		v8::HeapStatistics stats;
+		args.GetIsolate()->GetHeapStatistics(&stats);
+		//printf("limite:%u, used:%u\n", (unsigned int)stats.heap_size_limit(), (unsigned int)stats.used_heap_size());
+	}
 	v8::String::Utf8Value is_first_org(args[0]);
 	std::string is_first_src = *is_first_org;
 	bool is_first = (is_first_src.compare("true") == 0 )? true : false;
@@ -362,8 +368,12 @@ void CheckTime(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	args.GetIsolate()->GetHeapStatistics(&stats);
 	/*  printf("%u,%u,%u,%u,%u,%u,%u,%u,%u\n", stats.does_zap_garbage(), stats.heap_size_limit(), stats.malloced_memory(), stats.peak_malloced_memory(), stats.total_available_size(),
 	stats.total_heap_size(), stats.total_heap_size_executable(), stats.total_physical_size(), stats.used_heap_size());*/
-	//LOG_INFO("limite:%u, used:%u\n", (unsigned int)stats.heap_size_limit(), (unsigned int)stats.used_heap_size());
+	LOG_INFO("limite:%u, used:%u\n", (unsigned int)stats.heap_size_limit(), (unsigned int)stats.used_heap_size());
 	//printf("context->EstimatedSize:%d\n", context->EstimatedSize());
+	v8::V8InternalInfo internal_info;
+	args.GetIsolate()->GetV8InternalInfo(internal_info);
+	LOG_INFO("v8 max_stack_size:%d, remain:%d\n", internal_info.max_stack_size, internal_info.remain_stack_size);
+
 #endif
 
 	return;
@@ -581,7 +591,7 @@ int RunMain(v8::Isolate* isolate, v8::Platform* platform, int argc,
 // The read-eval-execute loop of the shell.
 void RunShell(v8::Local<v8::Context> context, v8::Platform* platform) {
   fprintf(stderr, "V8 version %s [sample shell]\n", v8::V8::GetVersion());
-  static const int kBufferSize = 100 * 1000;
+  static const int kBufferSize = 10 * 1000;
   // Enter the execution environment before evaluating any code.
   v8::Context::Scope context_scope(context);
   v8::Local<v8::String> name(
