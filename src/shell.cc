@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <map>
 #include <utility>
 #include <utility>      // std::pair
@@ -81,7 +82,7 @@ void shell_no_printf(const char* format, ...) {}
 
 std::map<std::string, std::string> file_script_map_;
 
-static int64_t Stoi64(const std::string &str) 
+static int64_t Stoi64(const std::string &str)
 {
 	int64_t v = 0;
 #ifdef WIN32
@@ -119,7 +120,6 @@ void Quit(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Version(const v8::FunctionCallbackInfo<v8::Value>& args);
 v8::MaybeLocal<v8::String> ReadFile(v8::Isolate* isolate, const char* name);
 void ReportException(v8::Isolate* isolate, v8::TryCatch* handler);
-
 static const char* last_location;
 static const char* last_message;
 void StoringErrorCallback(const char* location, const char* message) {
@@ -191,7 +191,7 @@ int Repetition(int argc, char* argv[])
 		isolate->Dispose();
 #endif
 	}
-	
+
 	delete create_params.array_buffer_allocator;
 	time_t end_t = time(0);
 	char end_tmp[64];
@@ -207,7 +207,7 @@ int Repetition(int argc, char* argv[])
 	v8::V8::Dispose();
 	v8::V8::ShutdownPlatform();
 	delete platform;
-	
+
 	return result;
 }
 
@@ -242,14 +242,17 @@ void ReadScriptFromFile(std::string file_name)
 	file_script_map_[file_name] = str;
 }
 
-int main(int argc, char* argv[]) 
+int main(int argc, char* argv[])
 {
 	ReadScriptFromFile("adsafe_dep.js");
 	ReadScriptFromFile("big.js");
 	ReadScriptFromFile("adsafe.js");
 	ReadScriptFromFile("jslint.js");
 	ReadScriptFromFile("test.js");
-	return Repetition(argc, argv);
+	Repetition(argc, argv);
+	printf("print any key to exit:\n");
+	getchar();
+	return 0;
 }
 
 
@@ -325,6 +328,7 @@ void Print(const v8::FunctionCallbackInfo<v8::Value>& args) {
       printf(" ");
     }
 
+
 	{
 		if (args[i]->IsObject()) {  //include map arrary
 			v8::Local<v8::String> jsStr = v8::JSON::Stringify(args.GetIsolate()->GetCurrentContext(), args[i]->ToObject()).ToLocalChecked();
@@ -357,7 +361,7 @@ void CheckTime(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 	v8::String::Utf8Value is_first_org(args[0]);
 	std::string is_first_src = *is_first_org;
-	bool is_first = (is_first_src.compare("true") == 0 )? true : false;
+	bool is_first = (is_first_src.compare("true") == 0) ? true : false;
 	if (is_first)
 	{
 		g_check_block_time_count++;
@@ -379,21 +383,21 @@ void CheckTime(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	return;
 }
 
-void Add(const v8::FunctionCallbackInfo<v8::Value>& args) 
+void Add(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	if (args.Length() != 2) 
+	if (args.Length() != 2)
 	{
 		args.GetIsolate()->ThrowException(
 			v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
-			v8::NewStringType::kNormal).ToLocalChecked());
+				v8::NewStringType::kNormal).ToLocalChecked());
 		return;
 	}
 
-	char add_result[100] = {0};
+	char add_result[100] = { 0 };
 
 	v8::String::Utf8Value add_1(args[0]);
 	v8::String::Utf8Value add_2(args[1]);
-	
+
 	int64_t add_int64_result = Stoi64(*add_1) + Stoi64(*add_2);
 #ifdef WIN32
 	sprintf(add_result, "%lld", add_int64_result);
@@ -406,8 +410,8 @@ void Add(const v8::FunctionCallbackInfo<v8::Value>& args)
 	return;
 }
 
-void Include(const v8::FunctionCallbackInfo<v8::Value>& args) 
-{	
+void Include(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
 	v8::Local<v8::Context> context = args.GetIsolate()->GetCurrentContext();
 	// Enter the execution environment before evaluating any code.
 	v8::Context::Scope context_scope(context);
@@ -435,7 +439,6 @@ void Include(const v8::FunctionCallbackInfo<v8::Value>& args)
 	v8::Local<v8::String> name(v8::String::NewFromUtf8(context->GetIsolate(), check_time, v8::NewStringType::kNormal).ToLocalChecked());
 	ExecuteString(context->GetIsolate(), v8::String::NewFromUtf8(context->GetIsolate(), js_file.data(), v8::NewStringType::kNormal).ToLocalChecked(), name, true, true);
 }
-
 
 // The callback that is invoked by v8 whenever the JavaScript 'read'
 // function is called.  This function loads the content of the file named in
@@ -595,7 +598,7 @@ void RunShell(v8::Local<v8::Context> context, v8::Platform* platform) {
   // Enter the execution environment before evaluating any code.
   v8::Context::Scope context_scope(context);
   v8::Local<v8::String> name(
-	  v8::String::NewFromUtf8(context->GetIsolate(), check_time,
+      v8::String::NewFromUtf8(context->GetIsolate(), check_time,
                               v8::NewStringType::kNormal).ToLocalChecked());
   while (true) {
     char buffer[kBufferSize];
@@ -625,12 +628,12 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 		std::string str;
 	}SplitCase;
 	static std::vector<SplitCase> split_cases;
-	
+
 	if (split_cases.empty())
 	{
 		std::string file_name = "v8-utest.txt";
 		static FILE * stream = fopen(file_name.data(), "r");
-		
+
 		if (stream == nullptr)
 		{
 			printf("cannot find v8-utest.txt\n");
@@ -682,7 +685,7 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 		v8::Context::Scope context_scope(context);
 		v8::Local<v8::String> name(
 			v8::String::NewFromUtf8(context->GetIsolate(), check_time,
-			v8::NewStringType::kNormal).ToLocalChecked());
+				v8::NewStringType::kNormal).ToLocalChecked());
 
 		char buffer[kBufferSize];
 		//fprintf(stderr, "> ");
@@ -690,13 +693,13 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 		ExecuteString(
 			context->GetIsolate(),
 			v8::String::NewFromUtf8(context->GetIsolate(), script_src.data(),
-			v8::NewStringType::kNormal).ToLocalChecked(),
+				v8::NewStringType::kNormal).ToLocalChecked(),
 			name, true, true);
-		
-		if ((g_check_block_time_count == (unsigned int)expect_block_result) 
+
+		if ((g_check_block_time_count == (unsigned int)expect_block_result)
 			&& (g_check_all_time_count == (unsigned int)expect_all_result))
 		{
-			LOG_INFO("-----------------------Utest [%d] OK.[expect,true] [%d,%u] [%d, %u]----------------------\n", 
+			LOG_INFO("-----------------------Utest [%d] OK.[expect,true] [%d,%u] [%d, %u]----------------------\n",
 				i + 1, expect_block_result, g_check_block_time_count, expect_all_result, g_check_all_time_count);
 		}
 		else
@@ -713,13 +716,14 @@ void RunUtest(v8::Local<v8::Context> context, v8::Platform* platform)
 			break;
 		}
 		//assert(g_check_block_time_count == expect_result);
-		
+
 		g_check_block_time_count = 0;
 		g_check_all_time_count = 0;
 	}
 
 	LOG_INFO("\n-----------------------Utest End------------------------------------------------\n");
 }
+
 
 // Executes a string within the current v8 context.
 bool ExecuteString(v8::Isolate* isolate, v8::Local<v8::String> source,
@@ -729,7 +733,6 @@ bool ExecuteString(v8::Isolate* isolate, v8::Local<v8::String> source,
   v8::TryCatch try_catch(isolate);
   v8::ScriptOrigin origin(name);
   v8::Local<v8::Context> context(isolate->GetCurrentContext());
-  
   v8::Local<v8::Script> script;
   if (!v8::Script::Compile(context, source, &origin).ToLocal(&script)) {
     // Print errors that happened during compilation.
@@ -751,18 +754,16 @@ bool ExecuteString(v8::Isolate* isolate, v8::Local<v8::String> source,
         // the returned value.
         v8::String::Utf8Value str(result);
         const char* cstr = ToCString(str);
-        //printf("run result:  %s\n", cstr);
+        //printf("%s\n", cstr);
       }
-	  v8::HeapStatistics stats;
-	  isolate->GetHeapStatistics(&stats);
-	  /*  printf("%u,%u,%u,%u,%u,%u,%u,%u,%u\n", stats.does_zap_garbage(), stats.heap_size_limit(), stats.malloced_memory(), stats.peak_malloced_memory(), stats.total_available_size(),
-			stats.total_heap_size(), stats.total_heap_size_executable(), stats.total_physical_size(), stats.used_heap_size());*/
-	  //printf("limite:%u, used:%u\n", stats.heap_size_limit(), stats.used_heap_size());
-	  //printf("context->EstimatedSize:%d\n", context->EstimatedSize());
       return true;
     }
-	//isolate->RequestInterrupt();
-	
+	v8::HeapStatistics stats;
+	isolate->GetHeapStatistics(&stats);
+	/*  printf("%u,%u,%u,%u,%u,%u,%u,%u,%u\n", stats.does_zap_garbage(), stats.heap_size_limit(), stats.malloced_memory(), stats.peak_malloced_memory(), stats.total_available_size(),
+	stats.total_heap_size(), stats.total_heap_size_executable(), stats.total_physical_size(), stats.used_heap_size());*/
+	//printf("limit:%u, used:%u\n", stats.heap_size_limit(), stats.used_heap_size());
+	//printf("context->EstimatedSize:%d\n", context->EstimatedSize());
   }
 }
 
